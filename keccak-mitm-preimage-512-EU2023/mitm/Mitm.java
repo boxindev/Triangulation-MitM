@@ -1,0 +1,391 @@
+package mitmsearch.mitm;
+
+import gurobi.*;
+
+import java.util.List;
+import java.util.ArrayList;
+import java.util.stream.IntStream;
+import java.util.stream.Collectors;
+import java.io.IOException;
+import java.io.File;
+import java.io.FileWriter;
+public class Mitm {
+  private final int Rounds;
+  private final GRBModel model;
+  private FileWriter logfile ;
+  private final MitmFactory factory;
+  private final GRBVar[][][][] Pi_init;
+  private final GRBVar[][][] Cond;
+  private final GRBVar[][][][][] DA;
+  private final GRBVar[][][][] DP;
+  private final GRBVar[][][][] DC1;
+  private final GRBVar[][][][] DP2;
+  private final GRBVar[][][][] DC12;
+  private final GRBVar[][][][][] DB;
+  private final GRBVar[][][][][] DC2;
+  private final GRBLinExpr   objective;
+  private final GRBVar[] obj;
+  private final GRBVar[][] dom;
+  private static final int[][] rho = new int[][]{{0,36,3,41,18},{1,44,10,45,2},{62,6,43,15,61},{28,55,25,21,56},{27,20,39,8,14}};
+
+  /**
+   * @param env the Gurobi environment
+   */
+  public Mitm(final GRBEnv env, final int Rounds) throws GRBException {
+    model = new GRBModel(env);
+    this.Rounds = Rounds;
+
+    factory = new MitmFactory(model);
+    Pi_init = new GRBVar[5][5][64][3];
+    Cond = new GRBVar[5][64][4];
+    DA = new GRBVar[Rounds+1][5][5][64][3];
+    DP = new GRBVar[Rounds][5][64][3];
+    DP2 = new GRBVar[Rounds][5][64][3];
+    DC1 = new GRBVar[Rounds][5][64][2];
+    DC12 = new GRBVar[Rounds][5][64][2];
+    DB = new GRBVar[Rounds][5][5][64][3];
+    DC2 = new GRBVar[Rounds][5][5][64][2];
+    // Initialization
+    for (int i = 0; i < 5; i++)
+      for (int j = 0; j < 5; j++)
+        for (int k = 0; k < 64; k++)
+          for (int l = 0; l < 3; l++) {
+            Pi_init[i][j][k][l] = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, "Pi_init_"+i+"_"+j+"_"+k+"_"+l);
+          }
+
+    for (int j = 0; j < 5; j++)
+      for (int k = 0; k < 64; k++)
+        for (int l = 0; l < 4; l++) {
+          Cond[j][k][l] = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, "Cond_"+j+"_"+k+"_"+l);
+        }
+
+    for (int round = 0; round < Rounds+1; round++)
+      for (int i = 0; i < 5; i++)
+        for (int j = 0; j < 5; j++)
+          for (int k = 0; k < 64; k++)
+            for (int l = 0; l < 3; l++) {
+              DA[round][i][j][k][l] = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, "DA_"+round+"_"+i+"_"+j+"_"+k+"_"+l);
+            }
+
+    for (int round = 0; round < Rounds; round++)
+      for (int i = 0; i < 5; i++)
+        for (int j = 0; j < 5; j++)
+          for (int k = 0; k < 64; k++)
+            for (int l = 0; l < 3; l++) {
+              DB[round][i][j][k][l] = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, "DB_"+round+"_"+i+"_"+j+"_"+k+"_"+l);
+            }
+
+    for (int round = 0; round < Rounds; round++)
+      for (int i = 0; i < 5; i++)
+        for (int j = 0; j < 5; j++)
+          for (int k = 0; k < 64; k++) {
+            for (int l = 0; l < 2; l++) {
+              DC2[round][i][j][k][l] = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, "DC2_" + round + "_" + i + "_" + j + "_" + k + "_" + l);
+            }
+
+          }
+
+
+    for (int round = 0; round < Rounds; round++)
+      for (int i = 0; i < 5; i++)
+        for (int k = 0; k < 64; k++)
+          for (int l = 0; l < 3; l++)  {
+            DP[round][i][k][l] = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, "DP_"+round+"_"+i+"_"+k+"_"+l);
+          }
+
+    for (int round = 0; round < Rounds; round++)
+      for (int i = 0; i < 5; i++)
+        for (int k = 0; k < 64; k++)
+          for (int l = 0; l < 3; l++)  {
+            DP2[round][i][k][l] = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, "DP2_"+round+"_"+i+"_"+k+"_"+l);
+          }
+    for (int round = 0; round < Rounds; round++)
+      for (int i = 0; i < 5; i++)
+        for (int k = 0; k < 64; k++) {
+          for (int l = 0; l < 2; l++) {
+            DC1[round][i][k][l] = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, "DC1_" + round + "_" + i + "_" + k + "_" + l);
+          }
+        }
+
+    for (int round = 0; round < Rounds; round++)
+      for (int i = 0; i < 5; i++)
+        for (int k = 0; k < 64; k++) {
+          for (int l = 0; l < 2; l++) {
+            DC12[round][i][k][l] = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, "DC12_" + round + "_" + i + "_" + k + "_" + l);
+          }
+        }
+
+    dom = new GRBVar[2][64];
+    for (int i = 0; i < 2; i++)
+      for (int k = 0; k < 64; k++){
+        dom[i][k]   = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, "dom_"+i+"_"+k);
+      }
+
+
+    //fixed input
+    for (int i = 0; i < 5; i++)
+      for (int j = 0; j < 5; j++)
+        for (int k = 0; k < 64; k++) {
+          for (int l = 0; l < 3; l++)  {
+            model.addConstr(DA[0][0][0][k][l], GRB.EQUAL, DA[0][1][3][(k+36)%64][l], "");
+            model.addConstr(DA[0][0][4][(k+62)%64][l], GRB.EQUAL, DA[0][1][2][(k+6)%64][l], "");
+          }
+          if ((i==0&j==0) | (i==1&j==3) | (i==0&j==4) | (i==1&j==2) ) {
+            model.addConstr(DA[0][i][j][k][1], GRB.EQUAL, 1, "");
+            GRBLinExpr known = new GRBLinExpr();
+            known.addTerm(1, DA[0][i][j][k][0]);
+            known.addTerm(1, DA[0][i][j][k][2]);
+            model.addConstr(known, GRB.LESS_EQUAL, 1, "");
+          }
+          else {
+            model.addConstr(DA[0][i][j][k][0], GRB.EQUAL, 0, "");
+            model.addConstr(DA[0][i][j][k][1], GRB.EQUAL, 1, "");
+            model.addConstr(DA[0][i][j][k][2], GRB.EQUAL, 0, "");
+          }
+
+        }
+    article_attack_eu23();
+
+    // todo
+    factory.addfixed_in_new_384(Pi_init,DA,Cond);
+    //factory.addconstr_in(Cond);
+
+    // Constraints
+    factory.addfivexor_red_new(DA, DP, DC1);
+    factory.addtwoxor_red_new(DP2, DP, DC12);
+    factory.addTheta_red_new(DA, DP2, DB, DC2);
+
+    // todo
+    factory.addSbox_new(DB, DA);
+
+    factory.addDoM_new(DA, dom);
+
+    /*
+    GRBVar[][] beta = new GRBVar[4][64];
+    for (int i = 0; i < 4; i++)
+      for (int k = 0; k < 64; k++){
+        beta[i][k]   = model.addVar(0.0, 1.0, 0.0, GRB.BINARY, "beta_"+i+"_"+k);
+    };
+    factory.betaConstraints(Pi_init, beta);
+
+     */
+
+
+
+    objective = new GRBLinExpr();
+    GRBLinExpr DoF_red = new GRBLinExpr();
+    GRBLinExpr DoF_blue = new GRBLinExpr();
+    GRBLinExpr DoM = new GRBLinExpr();
+
+    GRBVar Obj = model.addVar(0.0, 1600.0, 0.0, GRB.INTEGER, "Obj");
+
+    obj = new GRBVar[3];
+    obj[0] = model.addVar(0.0, 1600.0, 0.0, GRB.INTEGER, "Obj1");
+    obj[1] = model.addVar(0.0, 1600.0, 0.0, GRB.INTEGER, "Obj2");
+    obj[2] = model.addVar(0.0, 1600.0, 0.0, GRB.INTEGER, "Obj3");
+
+
+    for (int k = 0; k < 64; k++) {
+      DoF_blue.addTerm(1.0, Pi_init[0][0][k][0]);
+      DoF_red.addTerm(1.0, Pi_init[0][0][k][2]);
+
+      DoF_blue.addTerm(1.0, Pi_init[0][1][k][0]);
+      DoF_red.addTerm(1.0, Pi_init[0][1][k][2]);
+
+      DoF_blue.addTerm(1.0, Pi_init[0][2][k][0]);
+      DoF_red.addTerm(1.0, Pi_init[0][2][k][2]);
+
+      DoF_blue.addTerm(1.0, Pi_init[0][4][k][0]);
+      DoF_red.addTerm(1.0, Pi_init[0][4][k][2]);
+
+    }
+
+
+    for (int round = 0; round < Rounds; round ++)
+      for (int i = 0; i < 5; i++)
+        for (int k = 0; k < 64; k++) {
+          DoF_red.addTerm(-1.0, DC1[round][i][k][1]);
+          DoF_red.addTerm(-1.0, DC12[round][i][k][1]);
+          for (int j = 0; j < 5; j++) {
+            DoF_red.addTerm(-1.0, DC2[round][i][j][k][1]);
+          }
+        }
+
+
+
+
+    for (int i = 0; i < 2; i++)
+      for (int k = 0; k < 64; k++) {
+        DoM.addTerm(1.0, dom[i][k]);
+      }
+
+
+    GRBLinExpr Linear_Red = new GRBLinExpr();
+
+    for (int round = 0; round < Rounds; round ++)
+      for (int i = 0; i < 5; i++)
+        for (int k = 0; k < 64; k++) {
+          Linear_Red.addTerm(-1.0, DC1[round][i][k][0]);
+          Linear_Red.addTerm(1.0, DC1[round][i][k][1]);
+
+          Linear_Red.addTerm(-1.0, DC12[round][i][k][0]);
+          Linear_Red.addTerm(1.0, DC12[round][i][k][1]);
+        }
+
+
+    for (int round = 0; round < Rounds; round ++)
+      for (int i = 0; i < 5; i++)
+        for (int j = 0; j < 5; j ++) {
+          for (int k = 0; k < 64; k++) {
+            Linear_Red.addTerm(-1.0, DC2[round][i][j][k][0]);
+            Linear_Red.addTerm(1.0, DC2[round][i][j][k][1]);
+          }
+        }
+    model.addConstr(Linear_Red, GRB.GREATER_EQUAL, 49.0, "");
+
+
+    objective.addTerm(1.0, Obj);
+
+
+    model.addConstr(DoF_red, GRB.EQUAL, obj[0], "");
+    model.addConstr(DoF_blue, GRB.EQUAL, obj[1], "");
+    model.addConstr(DoM, GRB.EQUAL, obj[2], "");
+
+    model.addConstr(objective, GRB.LESS_EQUAL, DoF_blue, "");
+    model.addConstr(objective, GRB.LESS_EQUAL, DoF_red, "");
+    model.addConstr(objective, GRB.LESS_EQUAL, DoM, "");
+    model.setObjective(objective, GRB.MAXIMIZE);
+  }
+
+  public List<MitmSolution> solve(final int nSolutions, final boolean nonOptimalSolutions, final int minObjValue, final int Threads) throws GRBException {
+    model.read("tune1.prm");
+    model.write("model.lp");
+    model.set(GRB.IntParam.Threads, Threads);
+    if (minObjValue != -1)
+      model.addConstr(objective, GRB.EQUAL, minObjValue, "objectiveFix");
+    model.set(GRB.IntParam.DualReductions, 0);
+
+
+    try {
+      FileWriter logfile = null;
+      logfile = new FileWriter("cb.log");
+    }
+    catch (IOException e) { e.printStackTrace(); System.exit(1); }
+
+    GRBVar[] vars = model.getVars();
+    System.out.println (vars.length);
+    System.out.println (vars[0].get(GRB.StringAttr.VarName));
+    Callback cb = new Callback(vars,logfile);
+    model.setCallback(cb);
+
+    model.optimize();
+    model.write("output.sol");
+    //model.computeIIS();
+    //model.write("model1.ilp");
+    return getAllFoundSolutions();
+  }
+
+  public void dispose() throws GRBException {
+    model.dispose();
+  }
+
+  public List<MitmSolution> getAllFoundSolutions() throws GRBException {
+    return IntStream.range(0, model.get(GRB.IntAttr.SolCount)).boxed()
+            .map(solNb -> getSolution(solNb))
+            .collect(Collectors.toList());
+  }
+
+  private MitmSolution getSolution(final int solutionNumber) {
+    try {
+      model.set(GRB.IntParam.SolutionNumber, solutionNumber);
+      int[][][][] Pi_initValue     = new int[5][5][64][3];
+      int[][][] CondValue     = new int[5][64][4];
+      int[][][][][] DAValue     = new int[Rounds+1][5][5][64][3];
+      int[][][][] DPValue  = new int[Rounds][5][64][3];
+      int[][][][] DP2Value  = new int[Rounds][5][64][3];
+      int[][][][] DC1Value = new int[Rounds][5][64][2];
+      int[][][][] DC12Value = new int[Rounds][5][64][2];
+      int[][][][][] DBValue  = new int[Rounds][5][5][64][3];
+      int[][][][][] DC2Value  = new int[Rounds][5][5][64][2];
+      int[][] domValue  = new int[2][64];
+      int[] objValue  = new int[3];
+
+      for (int round = 0; round < Rounds; round++)
+        for (int i = 0; i < 5; i++)
+          for (int j = 0; j < 5; j++)
+            for (int k = 0; k < 64; k++) {
+              for (int l = 0; l < 2; l++) {
+                DC2Value[round][i][j][k][l] = (int) Math.round(DC2[round][i][j][k][l].get(GRB.DoubleAttr.Xn));
+              }
+
+              for (int l = 0; l < 3; l++)  {
+                DAValue[round][i][j][k][l]  = (int) Math.round(DA[round][i][j][k][l].get(GRB.DoubleAttr.Xn));
+                DBValue[round][i][j][k][l]  = (int) Math.round(DB[round][i][j][k][l].get(GRB.DoubleAttr.Xn));
+              }
+            }
+      for (int i = 0; i < 5; i++)
+        for (int j = 0; j < 5; j++)
+          for (int k = 0; k < 64; k++)
+            for (int l = 0; l < 3; l++)  {
+              DAValue[Rounds][i][j][k][l]  = (int) Math.round(DA[Rounds][i][j][k][l].get(GRB.DoubleAttr.Xn));
+              Pi_initValue[i][j][k][l]  = (int) Math.round(Pi_init[i][j][k][l].get(GRB.DoubleAttr.Xn));
+            }
+
+      for (int j = 0; j < 5; j++)
+        for (int k = 0; k < 64; k++)
+          for (int l = 0; l < 4; l++)  {
+            CondValue[j][k][l]  = (int) Math.round(Cond[j][k][l].get(GRB.DoubleAttr.Xn));
+          }
+      for (int round = 0; round < Rounds; round++)
+        for (int i = 0; i < 5; i++)
+          for (int k = 0; k < 64; k++) {
+            for (int l = 0; l < 2; l++) {
+              DC1Value[round][i][k][l] = (int) Math.round(DC1[round][i][k][l].get(GRB.DoubleAttr.Xn));
+              DC12Value[round][i][k][l] = (int) Math.round(DC12[round][i][k][l].get(GRB.DoubleAttr.Xn));
+            }
+
+            for (int l = 0; l < 3; l++)  {
+              DPValue[round][i][k][l]  = (int) Math.round(DP[round][i][k][l].get(GRB.DoubleAttr.Xn));
+              DP2Value[round][i][k][l]  = (int) Math.round(DP2[round][i][k][l].get(GRB.DoubleAttr.Xn));
+            }
+          }
+
+      for (int i = 0; i < 2; i++)
+        for (int k = 0; k < 64; k++)
+          domValue[i][k]  = (int) Math.round(dom[i][k].get(GRB.DoubleAttr.Xn));
+
+      for (int i = 0; i < 3; i++)
+        objValue[i]  = (int) Math.round(obj[i].get(GRB.DoubleAttr.Xn));
+
+      return new MitmSolution(Rounds, (int) Math.round(model.get(GRB.DoubleAttr.PoolObjVal)), Pi_initValue, CondValue, DAValue,DBValue, DC2Value, DPValue, DP2Value, DC1Value, DC12Value, domValue, objValue);
+    } catch (GRBException e) {
+      System.out.println("Error code: " + e.getErrorCode() + ". " + e.getMessage());
+      e.printStackTrace();
+      System.exit(1);
+      return null; // Can't access
+    }
+  }
+
+
+  private void article_attack_eu23() throws GRBException
+  {
+    int[][][][] DA_init = new int[][][][]
+            {{{{0,1,1},{0,1,1},{0,1,1},{0,1,1},{1,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{1,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{1,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{1,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1}},{{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0}},{{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0}},{{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0}},{{0,1,1},{0,1,1},{0,1,1},{0,1,1},{1,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{1,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{1,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{1,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1}}},{{{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0}},{{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0}},{{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{1,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{1,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{1,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{1,1,0},{0,1,1}},{{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{1,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{1,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{1,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,0},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{0,1,1},{1,1,0},{0,1,1}},{{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0},{0,1,0}}}};
+
+    for (int i = 0; i < 2; i++)
+      for (int j = 0; j < 5; j++)
+        for (int k = 0; k < 64; k++)
+          for (int l = 0; l < 3; l++)  {
+            model.addConstr(DA[0][i][j][k][l], GRB.EQUAL, DA_init[i][j][k][l], "");
+          }
+    int[][] dom_article = {{0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0}, {0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}};
+    for (int i = 0; i < 2; i++)
+      for (int k = 0; k < 64; k++) {
+        model.addConstr(dom[i][k], GRB.EQUAL,dom_article[i][k], "");
+      }
+
+
+  }
+
+
+}
