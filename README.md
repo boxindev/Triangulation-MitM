@@ -6,7 +6,7 @@ The folders are:
 - `ascon`: the code to search for MitM preimage attacks on ascon.
 - `Gimli`: the code to search for MitM preimage attacks on Gimli.
 - `keccak-mitm-preimage-512`: the code to search for MitM preimage attacks on Keccak-512.
-- 'keccak-mitm-preimage-512-EU2023': the code to search for MitM preimage attacks on Keccak-512 using the same initial structure of the paper in EUCRYPTO 2023.
+-  `keccak-mitm-preimage-512-EU2023`: the code to search for MitM preimage attacks on Keccak-512 using the same initial structure of the paper in EUCRYPTO 2023.
 - `Keccak-mitm-preimage-384`: the code to search for MitM preimage attacks on Keccak-384.
 - `Xoodyak`: the code to search for MitM preimage attacks on Xoodyak.
 - `Experiment`: the code of small-scale experiments on hashing model of AES-256.
