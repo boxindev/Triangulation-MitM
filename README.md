@@ -10,5 +10,5 @@ The folders are:
 - `Keccak-mitm-preimage-384`: the code to search for MitM preimage attacks on Keccak-384.
 - `Xoodyak`: the code to search for MitM preimage attacks on Xoodyak.
 - `Experiment`: the code of small-scale experiments on hashing model of AES-256.
-- 'MATRIX': Since the matrices of Keccak and Xoodyak are too large to show them in the paper, we put them in the MATRIX folder.
+- `MATRIX`: Since the matrices of Keccak and Xoodyak are too large to show them in the paper, we put them in the MATRIX folder.
 - `newlibs`: the dependent libraries.
