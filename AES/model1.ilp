@@ -1,0 +1,35 @@
+\ Model (null)_copy
+\ LP format - for model browsing. Use MPS format to capture full model detail.
+Maximize
+ 
+Subject To
+ R3148: RK21000 = 0
+ R3388: SBf_2_1_0_0_0 = 1
+ R3392: DCfAK_0_0_3_0 = 1
+ R3394: DCfAK_0_1_0_0 = 1
+ R3396: DCfAK_0_2_1_0 = 1
+ R3397: DCfAK_0_3_2_0 = 1
+ R3975: - Af_1_0_3_0_0 + DCfAK_0_0_3_0 + Allone0 = 0
+ R3997: - Af_1_1_0_0_0 + DCfAK_0_1_0_0 + Allone0 = 0
+ R4107: - Af_1_2_1_0_0 + DCfAK_0_2_1_0 + Allone0 = 0
+ R4217: - Af_1_3_2_0_0 + DCfAK_0_3_2_0 + Allone0 = 0
+ R4277: Af_1_1_0_0_0 - SBf_1_1_0_0_0 = 0
+ R4284: Af_1_2_1_0_0 - SBf_1_1_1_0_0 = 0
+ R4291: Af_1_3_2_0_0 - SBf_1_1_2_0_0 = 0
+ R4298: Af_1_0_3_0_0 - SBf_1_1_3_0_0 = 0
+ R4365: - SBf_1_1_0_0_0 - SBf_1_1_1_0_0 - SBf_1_1_2_0_0 - SBf_1_1_3_0_0
+   + AllOnef_1_1_0_0 >= -3
+ R4462: - MCf_1_1_0_0_0 + DCf_1_1_0_0 + AllOnef_1_1_0_0 = 0
+ R4650: RK21000 + MCf_1_1_0_0_0 - 2 Allone0 >= 0
+ R4655: MCf_1_1_0_0_0 + Twozero0 <= 1
+ R4665: - Af_2_1_0_0_0 + DCfAK_1_1_0_0 + Allone0 = 0
+ R4666: DCfAK_1_1_0_0 - Twozero0 <= 0
+ R4945: Af_2_1_0_0_0 - SBf_2_1_0_0_0 = 0
+Bounds
+Binaries
+ RK21000 Af_1_0_3_0_0 Af_1_1_0_0_0 Af_1_2_1_0_0 Af_1_3_2_0_0 Af_2_1_0_0_0
+ SBf_1_1_0_0_0 SBf_1_1_1_0_0 SBf_1_1_2_0_0 SBf_1_1_3_0_0 SBf_2_1_0_0_0
+ MCf_1_1_0_0_0 DCf_1_1_0_0 DCfAK_0_0_3_0 DCfAK_0_1_0_0 DCfAK_0_2_1_0
+ DCfAK_0_3_2_0 DCfAK_1_1_0_0 Allone0 Allone0 Allone0 Allone0
+ AllOnef_1_1_0_0 Allone0 Twozero0
+End
