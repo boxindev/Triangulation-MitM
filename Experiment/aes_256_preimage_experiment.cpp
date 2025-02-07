@@ -351,7 +351,7 @@ void aes_256_preimage_attack() {
 
     vector< vector<uint8_t> > BlueInitState;
     
-    int FALG = 1;
+    //int FALG = 1;
     /*
     printf("Begin Data Collection\n");
     for(uint32_t i = 0; i < 0xffffffff; i++){
@@ -663,255 +663,257 @@ void aes_256_preimage_attack() {
                     {0x47, 0xa0, 0xe0, 0x26, 0x71, 0xa3, 0xe5, 0xd9, 0x26, 0x8e, 0x9e, 0xb, 0x71, 0xfd, 0xe6, 0x8e, 0xb0, 0x26, 0xf7}};
     
     int MC3_zero[8] = {1,2,6,7,8,11,12,13};
-    for(uint32_t gray = 0; gray < 0x10000; gray++){  //A^5[2,6]
-      
-        uint8_t fix_b[19] = {0};
-        for(int i = 0; i < blue_number; i++){
-            fix_b[i] = BlueInitState[0][i];
-        }
-
-        map<uint8_t, vector<uint8_t>> TableRed;
-
-        for(uint32_t red =0; red < 0x100; red++){
-            uint8_t tmpS[32];
-            uint8_t newS[32];
-            for(int i = 0; i < 32; i++){
-                sKey[i] = 0;
-            }
-            sKey[3] = red;
+    for(uint32_t MC40 = 0; MC40 < 0x100; MC40++){
+        for(uint32_t gray = 0; gray < 0x10000; gray++){
+            uint8_t fix_b[19] = {0};
             for(int i = 0; i < blue_number; i++){
-                sKey[blue_index[i]] = fix_b[i];
-            } 
-
-            for(int i = 0; i < 32; i++){
-                newS[i] = sKey[i];
-            }
-            for(int i = skey_start_round; i > -1; i--) {
-                KeyExpansion_S2RK(newS,i);
-                KeyExpansion_S2S_inv(newS,tmpS);
-                for(int j = 0; j < 32; j++){
-                    newS[j] = tmpS[j];
-                }
-            }
-            for(int i = 0; i < 32; i++){
-                newS[i] = sKey[i];
-            }
-            for(int i = skey_start_round+1; i < skey_round ; i++) {
-                KeyExpansion_S2S(newS,tmpS);
-                for(int j = 0; j < 32; j++){
-                    newS[j] = tmpS[j];
-                }
-                KeyExpansion_S2RK(newS,i);
+                fix_b[i] = BlueInitState[0][i];
             }
 
-            uint8_t state[16] = {0};
-            state[2] = take8(red,0) ^ take8(gray,0);
-            state[6] = take8(red,0) ^ take8(gray,1);
-            InvMixColumn16(state);
-            InvShiftRow16(state); 
-            InvSubByte16(state);
-            AddRoundKey16(state,4);
-            for(int j=0; j<8;j++){
-                state[MC3_zero[j]] = 0;
-            }//MC^3
-            
-            for(int i = 3; i > -1; i--){
+            map<uint8_t, vector<uint8_t>> TableRed;
+
+            for(uint32_t red =0; red < 0x100; red++){
+                uint8_t tmpS[32];
+                uint8_t newS[32];
+                for(int i = 0; i < 32; i++){
+                    sKey[i] = 0;
+                }
+                sKey[3] = red;
+                for(int i = 0; i < blue_number; i++){
+                    sKey[blue_index[i]] = fix_b[i];
+                } 
+
+                for(int i = 0; i < 32; i++){
+                    newS[i] = sKey[i];
+                }
+                for(int i = skey_start_round; i > -1; i--) {
+                    KeyExpansion_S2RK(newS,i);
+                    KeyExpansion_S2S_inv(newS,tmpS);
+                    for(int j = 0; j < 32; j++){
+                        newS[j] = tmpS[j];
+                    }
+                }
+                for(int i = 0; i < 32; i++){
+                    newS[i] = sKey[i];
+                }
+                for(int i = skey_start_round+1; i < skey_round ; i++) {
+                    KeyExpansion_S2S(newS,tmpS);
+                    for(int j = 0; j < 32; j++){
+                        newS[j] = tmpS[j];
+                    }
+                    KeyExpansion_S2RK(newS,i);
+                }
+
+                uint8_t state[16] = {0};
+                state[0] = take8(MC40,0);
+                state[2] = take8(red,0) ^ take8(gray,0);
+                state[6] = take8(red,0) ^ take8(gray,1);
                 InvMixColumn16(state);
                 InvShiftRow16(state); 
                 InvSubByte16(state);
-                AddRoundKey16(state,i);
-            }
-
-            AddRoundKey16(state,10);
-            InvShiftRow16(state); 
-            InvSubByte16(state); 
-
-            uint8_t tmpRedMatch = 0; 
-            tmpRedMatch = mul3(state[12]) ^ state[14] ^ RoundKey[16*9+14];
-            if(TableRed.find(tmpRedMatch) != TableRed.end())
-            {
-                vector<uint8_t> ttmp =TableRed[tmpRedMatch];
-                ttmp.push_back(take8(red,0));
-                TableRed[tmpRedMatch] = ttmp;
-            } else {
-                vector<uint8_t> ttmp;
-                ttmp.push_back(take8(red,0));
-                TableRed[tmpRedMatch] = ttmp;
-            }
-        }
-
-
-        for(int blue = 0; blue < BlueInitState.size(); blue++){
-            uint8_t state[16] = {0};
-            uint8_t tmpS[32];
-            uint8_t newS[32];
-            
-            for(int i = 0; i < 32; i++){
-                sKey[i] = 0;
-            }
-
-            for(int i = 0; i < blue_number; i++){
-                sKey[blue_index[i]] = BlueInitState[blue][i];
-            } 
-
-            for(int i = 0; i < 32; i++){
-                newS[i] = sKey[i];
-            }
-            for(int i = skey_start_round; i > -1; i--) {
-                KeyExpansion_S2RK(newS,i);
-                KeyExpansion_S2S_inv(newS,tmpS);
-                for(int j = 0; j < 32; j++){
-                    newS[j] = tmpS[j];
+                AddRoundKey16(state,4);
+                for(int j=0; j<8;j++){
+                    state[MC3_zero[j]] = 0;
                 }
-            }
-            for(int i = 0; i < 32; i++){
-                newS[i] = sKey[i];
-            }
-            for(int i = skey_start_round+1; i < skey_round ; i++) {
-                KeyExpansion_S2S(newS,tmpS);
-                for(int j = 0; j < 32; j++){
-                    newS[j] = tmpS[j];
-                }
-                KeyExpansion_S2RK(newS,i);
-            }
-
-            for(int i = 0; i < 8; i++){
-                state[state_blue_index[i]] = RoundKey[4*16 + state_blue_index[i]];
-            }
-            subByte16(state);
-            ShiftRow16(state);
-            MixColumn16(state);
-            state[0] = 0;
-            state[1] = 0;
-            state[3] = 0;
-            state[4] = 0;
-            state[5] = 0;
-            state[7] = 0;
-            AddRoundKey16(state,5);
-            state[2] = take8(gray,0);
-            state[6] = take8(gray,1);  //A(5)
-            for(int i = 6; i < 9; i++){
-                subByte16(state);
-                ShiftRow16(state);
-                MixColumn16(state);
-                AddRoundKey16(state,i);
-            }
-            //A(8)
-            subByte16(state);
-            ShiftRow16(state);
-
-            uint32_t tmpBlueMatch = 0;
-            tmpBlueMatch = mul3(mul2(state[12])) ^ state[12] ^ mul3(mul3(state[13])) ^ state[13] ^ mul3(state[14]) ^ mul2(state[14]) ^ mul3(RoundKey[16*9+12]);
-
-            if(TableRed.find(tmpBlueMatch) != TableRed.end()) {
-                vector<uint8_t> ttmp = TableRed[tmpBlueMatch];
-                MatchNum += ttmp.size();
-
-                //verify
-                for (int k=0; k<ttmp.size(); k++) {
-                    uint8_t tmpRed = ttmp[k];
-                    sKey[3] = tmpRed;
-                    for(int i = 0; i < 32; i++){
-                        newS[i] = sKey[i];
-                    }
-                    for(int i = skey_start_round; i > -1; i--) {
-                        KeyExpansion_S2RK(newS,i);
-                        KeyExpansion_S2S_inv(newS,tmpS);
-                        for(int j = 0; j < 32; j++){
-                            newS[j] = tmpS[j];
-                        }
-                    }
-                    for(int i = 0; i < 32; i++){
-                        newS[i] = sKey[i];
-                    }
-                    for(int i = skey_start_round+1; i < skey_round ; i++) {
-                        KeyExpansion_S2S(newS,tmpS);
-                        for(int j = 0; j < 32; j++){
-                            newS[j] = tmpS[j];
-                        }
-                        KeyExpansion_S2RK(newS,i);
-                    }
-
-                    for(int i = 0; i < 16; i++){
-                        state[i] = 0;
-                    }
-                    state[2] = tmpRed ^ take8(gray,0);
-                    state[6] = tmpRed ^ take8(gray,1);
+                
+                for(int i = 3; i > -1; i--){
                     InvMixColumn16(state);
                     InvShiftRow16(state); 
                     InvSubByte16(state);
-                    uint8_t getState[16] = {0};
-                    for(int i = 0; i < 8; i++){
-                        getState[state_red_index[i]] = state[state_red_index[i]];
-                    } 
-                    AddRoundKey16(state,4);
-                    for(int j=0; j<8;j++){
-                        state[MC3_zero[j]] = 0;
-                    }
-                    for(int i = 3; i > -1; i--){
-                        InvMixColumn16(state);
-                        InvShiftRow16(state); 
-                        InvSubByte16(state);
-                        AddRoundKey16(state,i);
-                    }
+                    AddRoundKey16(state,i);
+                }
 
-                    uint8_t redTag[4] = {state[0],state[1],state[6],state[12]};
-                    
+                AddRoundKey16(state,10);
+                InvShiftRow16(state); 
+                InvSubByte16(state); 
 
-
-                    for(int i = 0; i < 16; i++){
-                        state[i] = 0;
-                    }
-
-                    for(int i = 0; i < 8; i++){
-                        state[state_blue_index[i]] = RoundKey[4*16 + state_blue_index[i]];
-                    }
-                    for(int i = 0; i < 8; i++){
-                        getState[state_blue_index[i]] = state[state_blue_index[i]];
-                    } 
-                    subByte16(state);
-                    ShiftRow16(state);
-                    MixColumn16(state);
-                    state[0] = 0;
-                    state[1] = 0;
-                    state[3] = 0;
-                    state[4] = 0;
-                    state[5] = 0;
-                    state[7] = 0;
-                    AddRoundKey16(state,5);
-                    state[2] = take8(gray,0);
-                    state[6] = take8(gray,1);
-                    for(int i = 6; i < 10; i++){
-                        subByte16(state);
-                        ShiftRow16(state);
-                        MixColumn16(state);
-                        AddRoundKey16(state,i);
-                    }
-                    subByte16(state);
-                    ShiftRow16(state);
-                    AddRoundKey16(state,10);
-                    
-                    if ((state[0]==redTag[0]) && (state[1]==redTag[1]) && (state[6]==redTag[2]) && (state[12]==redTag[3])){
-                        SucceedNum += 1;
-                        vector<uint8_t> sucIma;
-                        for(int i = 0; i < 32; i++){
-                            sucIma.push_back(sKey[i]);
-                        }
-                        for(int i = 0; i < 16; i++){
-                            sucIma.push_back(getState[i]);
-                        }
-                        PreImage.push_back(sucIma);
-                    }
+                uint8_t tmpRedMatch = 0; 
+                tmpRedMatch = mul3(state[12]) ^ state[14] ^ RoundKey[16*9+14];
+                if(TableRed.find(tmpRedMatch) != TableRed.end())
+                {
+                    vector<uint8_t> ttmp =TableRed[tmpRedMatch];
+                    ttmp.push_back(take8(red,0));
+                    TableRed[tmpRedMatch] = ttmp;
+                } else {
+                    vector<uint8_t> ttmp;
+                    ttmp.push_back(take8(red,0));
+                    TableRed[tmpRedMatch] = ttmp;
                 }
             }
 
+
+            for(int blue = 0; blue < BlueInitState.size(); blue++){
+                uint8_t state[16] = {0};
+                uint8_t tmpS[32];
+                uint8_t newS[32];
+                
+                for(int i = 0; i < 32; i++){
+                    sKey[i] = 0;
+                }
+
+                for(int i = 0; i < blue_number; i++){
+                    sKey[blue_index[i]] = BlueInitState[blue][i];
+                } 
+
+                for(int i = 0; i < 32; i++){
+                    newS[i] = sKey[i];
+                }
+                for(int i = skey_start_round; i > -1; i--) {
+                    KeyExpansion_S2RK(newS,i);
+                    KeyExpansion_S2S_inv(newS,tmpS);
+                    for(int j = 0; j < 32; j++){
+                        newS[j] = tmpS[j];
+                    }
+                }
+                for(int i = 0; i < 32; i++){
+                    newS[i] = sKey[i];
+                }
+                for(int i = skey_start_round+1; i < skey_round ; i++) {
+                    KeyExpansion_S2S(newS,tmpS);
+                    for(int j = 0; j < 32; j++){
+                        newS[j] = tmpS[j];
+                    }
+                    KeyExpansion_S2RK(newS,i);
+                }
+
+                for(int i = 0; i < 8; i++){
+                    state[state_blue_index[i]] = RoundKey[4*16 + state_blue_index[i]];
+                }
+                subByte16(state);
+                ShiftRow16(state);
+                MixColumn16(state);
+                state[0] = take8(MC40,0);
+                state[1] = 0;
+                state[3] = 0;
+                state[4] = 0;
+                state[5] = 0;
+                state[7] = 0;
+                AddRoundKey16(state,5);
+                state[2] = take8(gray,0);
+                state[6] = take8(gray,1); 
+                for(int i = 6; i < 9; i++){
+                    subByte16(state);
+                    ShiftRow16(state);
+                    MixColumn16(state);
+                    AddRoundKey16(state,i);
+                }
+                
+                subByte16(state);
+                ShiftRow16(state);
+
+                uint32_t tmpBlueMatch = 0;
+                tmpBlueMatch = mul3(mul2(state[12])) ^ state[12] ^ mul3(mul3(state[13])) ^ state[13] ^ mul3(state[14]) ^ mul2(state[14]) ^ mul3(RoundKey[16*9+12]);
+
+                if(TableRed.find(tmpBlueMatch) != TableRed.end()) {
+                    vector<uint8_t> ttmp = TableRed[tmpBlueMatch];
+                    MatchNum += ttmp.size();
+
+                    //verify
+                    for (int k=0; k<ttmp.size(); k++) {
+                        uint8_t tmpRed = ttmp[k];
+                        sKey[3] = tmpRed;
+                        for(int i = 0; i < 32; i++){
+                            newS[i] = sKey[i];
+                        }
+                        for(int i = skey_start_round; i > -1; i--) {
+                            KeyExpansion_S2RK(newS,i);
+                            KeyExpansion_S2S_inv(newS,tmpS);
+                            for(int j = 0; j < 32; j++){
+                                newS[j] = tmpS[j];
+                            }
+                        }
+                        for(int i = 0; i < 32; i++){
+                            newS[i] = sKey[i];
+                        }
+                        for(int i = skey_start_round+1; i < skey_round ; i++) {
+                            KeyExpansion_S2S(newS,tmpS);
+                            for(int j = 0; j < 32; j++){
+                                newS[j] = tmpS[j];
+                            }
+                            KeyExpansion_S2RK(newS,i);
+                        }
+
+                        for(int i = 0; i < 16; i++){
+                            state[i] = 0;
+                        }
+                        state[0] = take8(MC40,0);
+                        state[2] = tmpRed ^ take8(gray,0);
+                        state[6] = tmpRed ^ take8(gray,1);
+                        InvMixColumn16(state);
+                        InvShiftRow16(state); 
+                        InvSubByte16(state);
+                        uint8_t getState[16] = {0};
+                        for(int i = 0; i < 8; i++){
+                            getState[state_red_index[i]] = state[state_red_index[i]];
+                        } 
+                        AddRoundKey16(state,4);
+                        for(int j=0; j<8;j++){
+                            state[MC3_zero[j]] = 0;
+                        }
+                        for(int i = 3; i > -1; i--){
+                            InvMixColumn16(state);
+                            InvShiftRow16(state); 
+                            InvSubByte16(state);
+                            AddRoundKey16(state,i);
+                        }
+
+                        uint8_t redTag[5] = {state[0],state[1],state[2],state[6],state[12]};
+                        
+
+
+                        for(int i = 0; i < 16; i++){
+                            state[i] = 0;
+                        }
+
+                        for(int i = 0; i < 8; i++){
+                            state[state_blue_index[i]] = RoundKey[4*16 + state_blue_index[i]];
+                        }
+                        for(int i = 0; i < 8; i++){
+                            getState[state_blue_index[i]] = state[state_blue_index[i]];
+                        } 
+                        subByte16(state);
+                        ShiftRow16(state);
+                        MixColumn16(state);
+                        state[0] = take8(MC40,0);
+                        state[1] = 0;
+                        state[3] = 0;
+                        state[4] = 0;
+                        state[5] = 0;
+                        state[7] = 0;
+                        AddRoundKey16(state,5);
+                        state[2] = take8(gray,0);
+                        state[6] = take8(gray,1);
+                        for(int i = 6; i < 10; i++){
+                            subByte16(state);
+                            ShiftRow16(state);
+                            MixColumn16(state);
+                            AddRoundKey16(state,i);
+                        }
+                        subByte16(state);
+                        ShiftRow16(state);
+                        AddRoundKey16(state,10);
+                        
+                        if ((state[0]==redTag[0]) && (state[1]==redTag[1]) && (state[2]==redTag[2]) && (state[6]==redTag[3]) && (state[12]==redTag[4])){
+                            SucceedNum += 1;
+                            vector<uint8_t> sucIma;
+                            for(int i = 0; i < 32; i++){
+                                sucIma.push_back(sKey[i]);
+                            }
+                            for(int i = 0; i < 16; i++){
+                                sucIma.push_back(getState[i]);
+                            }
+                            PreImage.push_back(sucIma);
+                        }
+                    }
+                }
+
+            }
+    
+            
         }
- 
-        
     }
     end_time = clock();
     cout << "Finish! time is: " <<(double)(end_time - start_time) / CLOCKS_PER_SEC << "s" << endl;
-
     cout << "In total, 2^" << log(double(MatchNum))/log(2.0) << " match are tested!" << endl;
     cout << "In total, 2^" << log(double(SucceedNum))/log(2.0) << " success are found!" << endl;
     
@@ -923,12 +925,18 @@ void aes_256_preimage_attack() {
 }
 
 void verify(){
-    uint8_t sKey[32] = {0x2a, 0xe5, 0xd9, 0x5a, 0x45, 0x00, 0x63, 0xfb, 
-                        0xce, 0x8b, 0x45, 0x00, 0x06, 0x00, 0x00, 0x00, 
-                        0xd8, 0x61, 0x63, 0x00, 0x1d, 0x00, 0x00, 0x00, 
-                        0x99, 0xee, 0x38, 0x00, 0x00, 0x00, 0x45, 0x6e};
-    uint8_t init_state[16] = {0x5b, 0xfe, 0x74, 0xa7, 0xc5, 0x3d, 0xd9, 0x38, 
-                              0x65, 0x7b, 0x24, 0x1d, 0x63, 0x45, 0xf7, 0xfa};
+    uint8_t sKey[32] = {0x40, 0x09, 0x01, 0x7a, 0x2d, 0x00, 0x50, 0x53, 0x90, 0x60, 0x2d, 0x00, 0x70, 0x00, 0x00, 0x00, 0x30, 0x04, 0x50, 0x00, 0x8e, 0x00, 0x00, 0x00, 0x11, 0x82, 0x23, 0x00, 0x00, 0x00, 0x2d, 0xd8};
+    uint8_t init_state[16] = {0xb9, 0x7e, 0xf2, 0xba, 0x89, 0x36, 0x01, 0x23, 0x20, 0x6c, 0x59, 0x8e, 0x50, 0x2d, 0x70, 0x43};
+    
+    //uint8_t sKey[32] = {0xc7, 0xc6, 0xb4, 0xff, 0xe7, 0x00, 0xb3, 0x6d, 0x5a, 0xbe, 0xe7, 0x00, 0x51, 0x00, 0x00, 0x00, 0xa9, 0xd3, 0xb3, 0x00, 0x4e, 0x00, 0x00, 0x00, 0x73, 0x8f, 0xb5, 0x00, 0x00, 0x00, 0xe7, 0x94};
+    //uint8_t init_state[16] = {0x57, 0x2d, 0x8d, 0xc3, 0x50, 0x57, 0xb4, 0xb5, 0xe2, 0x75, 0xe3, 0x4e, 0xb3, 0xe7, 0x28, 0x9c};
+
+    //uint8_t sKey[32] = {0xe0, 0xe1, 0xf8, 0x6e, 0xd3, 0x00, 0x34, 0x18, 0x79, 0xb6, 0xd3, 0x00, 0x6c, 0x00, 0x00, 0x00, 0xa0, 0xe0, 0x34, 0x00, 0x8e, 0x00, 0x00, 0x00, 0x5f, 0xcf, 0xc3, 0x00, 0x00, 0x00, 0xd3, 0x66};
+    //uint8_t init_state[16] = {0xcd, 0x10, 0xe2, 0x6e, 0x40, 0xd8, 0xf8, 0xc3, 0x58, 0x19, 0x1a, 0x8e, 0x34, 0xd3, 0xbb, 0x11};
+
+    //uint8_t sKey[32] = {0xc0, 0xba, 0xf4, 0x17, 0x12, 0x00, 0x5a, 0xbe, 0x91, 0x81, 0x12, 0x00, 0x1a, 0x00, 0x00, 0x00, 0xd5, 0x03, 0x5a, 0x00, 0xf3, 0x00, 0x00, 0x00, 0xc7, 0xc6, 0x9d, 0x00, 0x00, 0x00, 0x12, 0xc9};
+    //uint8_t init_state[16] = {0xbf, 0xa4, 0x06, 0x44, 0x87, 0x32, 0xf4, 0x9d, 0x40, 0xde, 0x3c, 0xf3, 0x5a, 0x12, 0x39, 0xf7};
+
     uint8_t state[16] = {0};
     uint8_t newS[32] = {0};
     uint8_t tmpS[32] = {0};
