@@ -9,6 +9,6 @@ The folders are:
 -  `keccak-mitm-preimage-512-EU2023`: the code to search for MitM preimage attacks on Keccak-512 using the same initial structure of the paper in EUCRYPTO 2023.
 - `Keccak-mitm-preimage-384`: the code to search for MitM preimage attacks on Keccak-384.
 - `Xoodyak`: the code to search for MitM preimage attacks on Xoodyak.
-- `Experiment`: the code of small-scale experiments on hashing model of AES-256.
-- `MATRIX`: Since the matrices of Keccak and Xoodyak are too large to show them in the paper, we put them in the MATRIX folder.
+- `Experiment`: the code of small-scale experiments on the key-recovery attack of AES-128 and preimage attack of the hashing model of AES-256.
+- `MATRIX`: Since the matrices of Keccak and Xoodyak are too large to show in the paper, we put them in the MATRIX folder.
 - `newlibs`: the dependent libraries.
