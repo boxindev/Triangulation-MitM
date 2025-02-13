@@ -35,3 +35,11 @@ Time is about 200 seconds on a computer with an i9-13900KF CPU and 32GB memory.
 Time is about 35000 seconds on a computer with an i9-13900KF CPU and 32GB memory.
 - compile: g++ aes_256_preimage_experiment.cpp -o aes_256_preimage_experiment
 - run: aes_256_preimage_experiment.exe
+
+## For 3-round Ascon preimage attack
+- compile: g++ attack_ascon_3r.cpp ascon.cpp -o attack_ascon_3r
+- run: attack_ascon_3r.exe
+
+## For 4-round Ascon preimage attack
+- compile: g++ attack_ascon_4r.cpp ascon.cpp -o attack_ascon_4r
+- run: attack_ascon_4r.exe
